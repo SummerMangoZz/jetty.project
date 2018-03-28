@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jetty.util.IO;
 import org.eclipse.jetty.util.Loader;
-import org.eclipse.jetty.util.QuotedStringTokenizer;
 import org.eclipse.jetty.util.TypeUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -93,10 +92,21 @@ public class JSON
     public final static JSON DEFAULT = new JSON();
 
     private Map<String, Convertor> _convertors = new ConcurrentHashMap<String, Convertor>();
+    private StringEncoder _stringEncoder = new JSONDefaultStringEncoder();
     private int _stringBufferSize = 1024;
 
     public JSON()
     {
+    }
+
+    /**
+     * Reset the JSON behaviors to default
+     */
+    public static void reset()
+    {
+        DEFAULT._convertors.clear();
+        DEFAULT._stringEncoder = new JSONDefaultStringEncoder();
+        DEFAULT._stringBufferSize = 1024;
     }
 
     /**
@@ -129,6 +139,21 @@ public class JSON
     public static void registerConvertor(Class forClass, Convertor convertor)
     {
         DEFAULT.addConvertor(forClass,convertor);
+    }
+
+    /**
+     * Set the preferred String Encoder for JSON
+     *
+     * @param encoder the encoder implementation
+     */
+    public static void setStringEncoder(StringEncoder encoder)
+    {
+        DEFAULT._stringEncoder = encoder;
+    }
+
+    public static StringEncoder getStringEncoder()
+    {
+        return DEFAULT._stringEncoder;
     }
 
     public static JSON getDefault()
@@ -428,7 +453,7 @@ public class JSON
             while (iter.hasNext())
             {
                 Map.Entry<?,?> entry = (Map.Entry<?,?>)iter.next();
-                QuotedStringTokenizer.quote(buffer,entry.getKey().toString());
+                _stringEncoder.encode(buffer, entry.getKey().toString());
                 buffer.append(':');
                 append(buffer,entry.getValue());
                 if (iter.hasNext())
@@ -573,7 +598,7 @@ public class JSON
             return;
         }
 
-        QuotedStringTokenizer.quote(buffer,string);
+        _stringEncoder.encode(buffer,string);
     }
 
     // Parsing utilities
@@ -1353,7 +1378,7 @@ public class JSON
                 if (c == 0)
                     throw new IllegalStateException();
                 _buffer.append(c);
-                QuotedStringTokenizer.quote(_buffer,name);
+                _stringEncoder.encode(_buffer,name);
                 _buffer.append(':');
                 append(_buffer,value);
                 c = ',';
@@ -1372,7 +1397,7 @@ public class JSON
                 if (c == 0)
                     throw new IllegalStateException();
                 _buffer.append(c);
-                QuotedStringTokenizer.quote(_buffer,name);
+                _stringEncoder.encode(_buffer,name);
                 _buffer.append(':');
                 appendNumber(_buffer, value);
                 c = ',';
@@ -1391,7 +1416,7 @@ public class JSON
                 if (c == 0)
                     throw new IllegalStateException();
                 _buffer.append(c);
-                QuotedStringTokenizer.quote(_buffer,name);
+                _stringEncoder.encode(_buffer,name);
                 _buffer.append(':');
                 appendNumber(_buffer, value);
                 c = ',';
@@ -1410,7 +1435,7 @@ public class JSON
                 if (c == 0)
                     throw new IllegalStateException();
                 _buffer.append(c);
-                QuotedStringTokenizer.quote(_buffer,name);
+                _stringEncoder.encode(_buffer,name);
                 _buffer.append(':');
                 appendBoolean(_buffer,value?Boolean.TRUE:Boolean.FALSE);
                 c = ',';
@@ -1568,7 +1593,11 @@ public class JSON
         public void add(String name, boolean value);
     }
 
-    /* ------------------------------------------------------------ */
+    public interface StringEncoder
+    {
+        void encode(Appendable appendable, String string);
+    }
+
     /**
      * JSON Convertible object. Object can implement this interface in a similar
      * way to the {@link Externalizable} interface is used to allow classes to
